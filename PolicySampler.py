@@ -9,7 +9,7 @@ env = gym.make('castle-v0', render_mode = "rgb_array")
 
 agent = PolicySamplerAgent(env,9,9, 4,1, 1)
 
-agent.sampler(0,1000,final_ln_f=1e-2)
+agent.sampler(0,1000)
 
 
 

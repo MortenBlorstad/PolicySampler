@@ -124,7 +124,7 @@ class PolicySamplerAgent(SarsaAgent):
         self.epsilon = epsilon
 
 
-    def sampler(self,E_min,E_max, flatness_criteria=0.8, final_ln_f=1e-2, binsize= 10):
+    def sampler(self,E_min,E_max, flatness_criteria=0.8, max_iter=10000, binsize= 10):
         num_bins = (E_max - E_min) // binsize + 1
         E_range = np.arange(E_min, E_max + binsize,binsize) # set seectrum Gamma
         S = np.zeros(num_bins)  # entropy
@@ -140,7 +140,7 @@ class PolicySamplerAgent(SarsaAgent):
         iteration = 0  # Counter for iterations
         images = []
 
-        while ln_f > final_ln_f:
+        for _ in range(max_iter):
             iteration += 1
             proposed_pi = softmax(self.pi + self.epsilon*np.random.normal(size=self.pi.shape),axis=2)
             proposed_E = self.evaluate(proposed_pi)
@@ -179,12 +179,7 @@ class PolicySamplerAgent(SarsaAgent):
                 plt.savefig('temp.png') # Save the plot as a PNG
                 images.append(imageio.imread('temp.png'))  # Load the saved image
                 plt.close(fig)  # Close the plot figure
-                if  flatness_criteria < minH/meanH < 1/flatness_criteria:  # Flatness condition
-                    print(f"Reducing ln_f: {ln_f} -> {ln_f / 2} at iteration {iteration}")
-                    
-                    ln_f /= 2.0  # Reduce the modification factor
-                    H[:] = 0  # Reset histogram
-
+                
         # Create GIF
         imageio.mimsave('sampling_animation.gif', images, fps=2, loop = 0)
         os.remove('temp.png')
