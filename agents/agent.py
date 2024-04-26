@@ -49,6 +49,11 @@ class SarsaAgent(AbstractAgent):
         self.gamma = gamma
         self.alpha = alpha
         self.epsilon = epsilon
+        self.E_max = 200
+        self.binsize = 1
+        self.num_bins = (self.E_max - 0) // self.binsize + 1
+        self.S = np.zeros(self.num_bins)  # entropy
+        self.H = np.zeros(self.num_bins)  # histogram of visited E
 
         
 
@@ -68,13 +73,17 @@ class SarsaAgent(AbstractAgent):
 
         action_values = self.Q[state[0], state[1]]*self.offset[state[0], state[1]]
         if np.random.uniform()<self.epsilon:
-            return np.random.choice(len(action_values))  
-    
-        max_value = np.max(action_values)
-        max_actions = np.where(action_values == max_value)[0]
-        
-        
-        action = np.random.choice(max_actions)
+            action = np.random.choice(len(action_values))  
+        else:
+            max_value = np.max(action_values)
+            max_actions = np.where(action_values == max_value)[0]
+            
+            
+            action = np.random.choice(max_actions)
+
+        E = abs(action_values[action])
+        current_E_bin = round((E - 0) // self.binsize)
+        self.H[current_E_bin] += 1
         return action
 
 import matplotlib.pyplot as plt
@@ -235,5 +244,7 @@ class PolicySamplerAgent(SarsaAgent):
 
 
 
+
+ 
 
 
