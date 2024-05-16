@@ -49,25 +49,7 @@ class QWLAgent():
     def moving_average(self,x,w):
         return np.convolve(x, np.ones(w), 'valid') / w
 
-    # def select_behaviour_action(self, state):
-    #     """Sample action using wang landau sampling"""
-    #     action_values = self.Q[state]
-    #     E = abs(np.max(action_values))
-    #     current_E_bin = round((E - 0) // self.binsize)
-        
-    #     while True:
-    #         action = np.random.choice(len(action_values))
-    #         proposed_E = abs(action_values[action])
-    #         proposed_E_bin = round((proposed_E - 0) // self.binsize)
-    #         if proposed_E < 0 or proposed_E > self.E_max :
-    #             continue
-    #         # Metropolis-Hastings acceptance criterion (in log form)
-    #         if np.log(np.random.rand()) < self.S[current_E_bin] - self.S[proposed_E_bin]:
-    #             current_E_bin = proposed_E_bin  # Accept move        
-    #             break
-    #     self.S[current_E_bin] += self.f
-    #     self.H[current_E_bin] += 1
-    #     return action
+
 
 
     def select_behaviour_action(self, state):
@@ -77,25 +59,9 @@ class QWLAgent():
         E = abs(np.max(action_values))
         current_E_bin = round((E - 0) // self.binsize)
 
-        # if np.random.uniform()<self.greedy_prob:
-        #     self.S[current_E_bin] += self.f
-        #     self.H[current_E_bin] += 1
-        #     self.greedy_prob*=0.99999 
-        #     return action
-        
         accepted = False
-        # if self.H[current_E_bin].sum()>1000:
-        #     self.S = np.zeros(self.num_bins)  # entropy
-        #     self.H = np.zeros(self.num_bins)  # histogram of visited E 
-
+    
         while not accepted:
-            # valid_indices = action_values != -np.inf
-            # valid_scores = np.zeros(len(action_values))
-            # valid_scores[valid_indices] = 1
-            # probabilities = np.zeros(len(action_values))
-            # probabilities[valid_indices] = softmax(valid_scores)
-            
-
             action = np.random.choice(len(action_values))
             
             proposed_E = abs(action_values[action])
@@ -115,50 +81,17 @@ class QWLAgent():
             
         return action
           
-        # non_zero_values = self.H[self.H != 0]
-        # if len(non_zero_values)>10:
-        #     #print(np.percentile(non_zero_values, q = [25,75]))
-        #     min_value,max_value = np.percentile(non_zero_values, q = [25,75])
-
-        #     min_E_bin = round((min_value - 0) // self.binsize)
-        #     max_E_bin = round((max_value - 0) // self.binsize)
-        
-            #self.S[0:(min_E_bin+1)] = 0
-            #self.S[max_E_bin:] = 0
-
-
-
-        # if self.is_histogram_flat():
-        #     #print("reset")
-        #     self.f = max(0.9* self.f,0.1)
-        #     self.H = np.zeros(self.num_bins)  # histogram of visited E
-        #     #self.S = np.zeros(self.num_bins)  # histogram of visited E
-
-
+    
     def select_action(self, state):
         """Select greedy action from Q-function"""
         action_values = self.Q[state]
         max_value = np.max(action_values)
         
-        # if np.random.uniform()<0.0:
-        #     exp_values = np.exp(action_values - max_value) 
-        #     probabilities = exp_values / np.sum(exp_values)
-        #     action = np.random.choice(len(action_values), p=probabilities)
-        # else:
-        #     max_actions = np.where(action_values == max_value)[0]
-        #     action = np.random.choice(max_actions)
 
         max_actions = np.where(action_values == max_value)[0]
         action = np.random.choice(max_actions)
         return action
 
-    # def select_action(self, state):
-    #     """Select an action based on softmax probabilities of Q-values."""
-    #     action_values = self.Q[state[0], state[1]]
-    #     exp_values = np.exp(action_values - np.max(action_values))  # Subtract max for numerical stability
-    #     probabilities = exp_values / np.sum(exp_values)
-    #     action = np.random.choice(len(action_values), p=probabilities)
-    #     return action
 
 
     def learn(self, state, action, reward, next_state):
