@@ -5,16 +5,27 @@ from gymnasium import spaces
 import pygame
 import os
 
-class ShortcutMazeEnv(gym.Env):
+
+
+
+class CityEnv(gym.Env):
     metadata = {
         'render_modes': ['human', 'rgb_array'],
         'render_fps': 4  # Ensure this is set if your environment should dictate the fps
     }
+
+    
     def __init__(self, render_mode=None):
         
+
+
         self.window_size = (1200, 800) 
   
-        self.MAP = 1 - (np.genfromtxt(os.path.join('pathfinders','envs','shortcutmaze.txt'),float)-1.0)
+        self.MAP = 1 - (np.genfromtxt(os.path.join('pathfinders','envs','city.txt'),float)-1.0)
+        indices = np.where(self.MAP == -1)
+        
+        self.charging_stations_loc = list(zip(indices[0], indices[1]))
+        self.MAP[indices] = 1
         self.height = self.MAP.shape[0]  # The height of the grid
         self.width = self.MAP.shape[1]  # The width of the grid
         self.graphics = np.expand_dims(self.MAP, axis = 2)
@@ -24,8 +35,12 @@ class ShortcutMazeEnv(gym.Env):
 
         self._step = 0
         self.graphics[:,:,3] = 1-self.graphics[:,:,3]
+        for i,j in self.charging_stations_loc:
+            self.graphics[i,j,:] = (0,0,255,0.7) # Station 1
+        self.graphics[11, 2,:] = (0,255,0,0.7) # #start
+        self.graphics[2,11,:] = (0,255,0,0.7) #goal
 
-        self.start_position = np.array([self.height-2, 1])
+        self.start_position = np.array([11, 2])
         
 
         self.observation_space = spaces.Dict(
@@ -35,12 +50,13 @@ class ShortcutMazeEnv(gym.Env):
                             low=np.array([0, 0]), 
                             high=np.array([self.width - 1, self.height - 1]), 
                             dtype=np.int32
-                        )
+                        ),
+                        "charge":spaces.Discrete(20)
                           }
                 ) 
             }
         )
-        self.shortcut = False
+
         # We have 3 actions, corresponding to "leftforward", "straigth", "left", "rightforward"
         self.action_space = spaces.Discrete(4)
 
@@ -58,6 +74,7 @@ class ShortcutMazeEnv(gym.Env):
        
 
         
+        self.change = False
 
         
 
@@ -76,16 +93,58 @@ class ShortcutMazeEnv(gym.Env):
         self.clock = None
     
 
-    def open_shortcut(self):
-        self.MAP[21,5:7] = 1
-        self.graphics[21,5:7,:3]=255
+    def get_valid_Q(self):
+        nrows, ncols = self.MAP.shape
+        num_actions = len(self.action_to_direction)
+        Q = np.full((nrows, ncols,21, num_actions), -np.inf)
+        for r in range(nrows):
+            for c in range(ncols):
+                if self.MAP[r, c] != 0:
+                    for action, direction in self.action_to_direction.items():
+                        new_r, new_c = r + direction[0], c + direction[1]
+                        if 0 <= new_r < nrows and 0 <= new_c < ncols and self.MAP[new_r, new_c] != 0:
+                             Q[r, c,:, action] = 0  # Mark as a valid action
+        return Q
 
-    def close_shortcut(self):
-        self.MAP[21,5:7] = 0
-        self.graphics[21,5:7,:3] = 0
+    def set_change(self, change):
+        self.change = change
+
+
+
+    def canCharge(self,pos):
+        i, j = pos
+        
+        if (i, j) in self.charging_stations_loc:
+            return True 
+        return False
+
+    
+    def charge(self,pos, charge):
+        
+        
+        #[(1, 1), (3, 1), (6, 8), (6, 12), (10, 7), (13, 10)]
+        i, j = pos
+        if (i, j) == self.charging_stations_loc[0]:#station 1
+            return -14   
+        if (i, j) == self.charging_stations_loc[1]:#station 2
+            return -25
+        if (i, j) == self.charging_stations_loc[2]:#station 3
+            return -16 
+        if (i, j) == self.charging_stations_loc[3]:#station 4
+            return -np.random.uniform(14,16)
+        if (i, j) == self.charging_stations_loc[4]:#station 5:
+            return -15  
+        if (i, j) == self.charging_stations_loc[5]:#station 6: ARRRG
+            return -100  
+    
+        print(f"Position: x = {i}, y = {j}")
+        raise Exception("not at a charging station")
+    
+
 
     def _get_obs(self):
-        return {"agent": {"pos": self._agent_location}}
+        return {"agent": {"pos": self._agent_location, "charge":self._agent_charge}}
+
 
 
     def _get_info(self):
@@ -100,8 +159,8 @@ class ShortcutMazeEnv(gym.Env):
         self._step = 0
         self._cummlative_reward = 0
 
-        self._target_location = np.array([1,self.width-2])
-        
+        self._target_location = np.array([2,11])
+        self._agent_charge = 20
 
         observation = self._get_obs()
         info = self._get_info()
@@ -126,18 +185,28 @@ class ShortcutMazeEnv(gym.Env):
     
 
         self._step += 1    
-        reward = -1
+        reward = 0
         if self.MAP[next_pos[0],next_pos[1]]!=0:
             self._agent_location = next_pos
 
-        
+        self._agent_charge -=1
+       
+        if self.canCharge(self._agent_location):
+            reward = self.charge(self._agent_location,self._agent_charge)
+            self._agent_charge=20
+        elif self._agent_charge<=0:
+            reward = -100
+            self._agent_location = np.array([13,10])
+            self._agent_charge = 20
+
+
         # An episode is done if the agent has reached the target
         reached_goal= np.array_equal(self._agent_location, self._target_location)
         terminated = reached_goal
-        truncated =  False#self._step>=200
+        truncated =  False #self._step>=200
+        if terminated:
+            reward = 0
 
-        if reached_goal:
-            reward =0
         self._cummlative_reward +=reward
         
         observation = self._get_obs()
@@ -169,11 +238,19 @@ class ShortcutMazeEnv(gym.Env):
         for row in range(self.height):
             for col in range(self.width):
                 color = self.graphics[row, col]
-                pygame.draw.rect(
+                if np.all(color[:3]==255):
+                    c = 255 - ((row + col) % 2)*50
+                    pygame.draw.rect(
                     canvas,
-                    color[:3],  # Use the first three values (RGB) from the color
-                    (col * pix_square_size, row* pix_square_size, pix_square_size, pix_square_size),
+                    (c,c,c),  # Use the first three values (RGB) from the color
+                    (col * pix_square_size, row * pix_square_size, pix_square_size, pix_square_size),
                 )
+                else:
+                    pygame.draw.rect(
+                        canvas,
+                        color[:3],  # Use the first three values (RGB) from the color
+                        (col * pix_square_size, row * pix_square_size, pix_square_size, pix_square_size),
+                    )
 
 
         pygame.draw.rect(

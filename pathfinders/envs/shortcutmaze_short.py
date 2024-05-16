@@ -5,7 +5,7 @@ from gymnasium import spaces
 import pygame
 import os
 
-class ShortcutMazeEnv(gym.Env):
+class ShortcutShortMazeEnv(gym.Env):
     metadata = {
         'render_modes': ['human', 'rgb_array'],
         'render_fps': 4  # Ensure this is set if your environment should dictate the fps
@@ -14,7 +14,7 @@ class ShortcutMazeEnv(gym.Env):
         
         self.window_size = (1200, 800) 
   
-        self.MAP = 1 - (np.genfromtxt(os.path.join('pathfinders','envs','shortcutmaze.txt'),float)-1.0)
+        self.MAP = 1 - (np.genfromtxt(os.path.join('pathfinders','envs','shorcutmaze_small.txt'),float)-1.0)
         self.height = self.MAP.shape[0]  # The height of the grid
         self.width = self.MAP.shape[1]  # The width of the grid
         self.graphics = np.expand_dims(self.MAP, axis = 2)
@@ -77,12 +77,12 @@ class ShortcutMazeEnv(gym.Env):
     
 
     def open_shortcut(self):
-        self.MAP[21,5:7] = 1
-        self.graphics[21,5:7,:3]=255
+        self.MAP[5,1] = 1
+        self.graphics[5,1,:3]=255
 
     def close_shortcut(self):
-        self.MAP[21,5:7] = 0
-        self.graphics[21,5:7,:3] = 0
+        self.MAP[5,1] = 0
+        self.graphics[5,1,:3] = 0
 
     def _get_obs(self):
         return {"agent": {"pos": self._agent_location}}
@@ -100,7 +100,7 @@ class ShortcutMazeEnv(gym.Env):
         self._step = 0
         self._cummlative_reward = 0
 
-        self._target_location = np.array([1,self.width-2])
+        self._target_location = np.array([1,1])
         
 
         observation = self._get_obs()

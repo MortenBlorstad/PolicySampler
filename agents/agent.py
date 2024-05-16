@@ -39,9 +39,17 @@ class AbstractAgent(ABC):
         """
         pass
 
+    @abstractmethod
+    def reset(self,):
+        """
+        Abstract method to define how to reset the agent.
+        """
+        pass
 
 
-class SarsaAgent(AbstractAgent):
+
+class QAgent(AbstractAgent):
+    
     
     def __init__(self, nrows:int,ncols:int,  action_space:int,epsilon = 0.3, alpha:float = 0.1, gamma:float = 1.0) -> None:
         self.Q = np.zeros((nrows,ncols,action_space))
@@ -49,13 +57,14 @@ class SarsaAgent(AbstractAgent):
         self.gamma = gamma
         self.alpha = alpha
         self.epsilon = epsilon
-        self.E_max = 200
+        self.E_max = 50000
         self.binsize = 1
         self.num_bins = (self.E_max - 0) // self.binsize + 1
         self.S = np.zeros(self.num_bins)  # entropy
         self.H = np.zeros(self.num_bins)  # histogram of visited E
 
-        
+    def reset(self):
+        self.Q = np.zeros(self.Q.shape)
 
     def learn(self, state, action, reward, next_state):
         """
@@ -63,6 +72,72 @@ class SarsaAgent(AbstractAgent):
 
         """
         next_action = self.select_action(next_state)
+
+        td_error =  reward + self.gamma*self.Q[next_state][next_action] - self.Q[state][action]
+
+        self.Q[state][action] += self.alpha * td_error
+
+
+    def select_behaviour_action(self, state):
+        
+        action_values = self.Q[state].copy()
+        
+        
+        if np.random.uniform()<self.epsilon:
+            # valid_indices = action_values != -np.inf
+            # valid_scores = action_values[valid_indices]
+            # probabilities = np.zeros(len(action_values))
+            # probabilities[valid_indices] = softmax(valid_scores)
+            action = np.random.choice(len(action_values)) 
+            
+        else:
+            max_value = np.max(action_values)
+           
+            max_actions = np.where(action_values == max_value)[0]
+            
+            
+            action = np.random.choice(max_actions)
+        
+
+        E = abs(action_values[action])
+        
+        current_E_bin = round((E - 0) // self.binsize)
+        self.H[current_E_bin] += 1
+        return action
+    
+    def select_action(self, state):
+        """Select greedy action from Q-function"""
+        action_values = self.Q[state]
+        max_value = np.max(action_values)
+        max_actions = np.where(action_values == max_value)[0]
+        action = np.random.choice(max_actions)
+        return action
+
+
+class SarsaAgent(AbstractAgent):
+    
+    
+    def __init__(self, nrows:int,ncols:int,  action_space:int,epsilon = 0.3, alpha:float = 0.1, gamma:float = 1.0) -> None:
+        self.Q = np.zeros((nrows,ncols,action_space))
+        self.offset = np.ones((nrows,ncols,action_space))
+        self.gamma = gamma
+        self.alpha = alpha
+        self.epsilon = epsilon
+        self.E_max = 50000
+        self.binsize = 1
+        self.num_bins = (self.E_max - 0) // self.binsize + 1
+        self.S = np.zeros(self.num_bins)  # entropy
+        self.H = np.zeros(self.num_bins)  # histogram of visited E
+
+    def reset(self):
+        self.Q = np.zeros(self.Q.shape)
+
+    def learn(self, state, action, reward, next_state):
+        """
+        TD0 update of action value
+
+        """
+        next_action = self.Q[next_state].argmax()
         td_error =  reward + self.gamma*self.Q[next_state][next_action] - self.Q[state][action]
 
         self.Q[state][action] += self.alpha * td_error
@@ -70,21 +145,34 @@ class SarsaAgent(AbstractAgent):
 
     def select_action(self, state):
         
-
-        action_values = self.Q[state[0], state[1]]*self.offset[state[0], state[1]]
+        action_values = self.Q[state].copy()
+        
+        
         if np.random.uniform()<self.epsilon:
-            action = np.random.choice(len(action_values))  
+            # valid_indices = action_values != -np.inf
+            # valid_scores = action_values[valid_indices]
+            # probabilities = np.zeros(len(action_values))
+            # probabilities[valid_indices] = softmax(valid_scores)
+            action = np.random.choice(len(action_values)) 
+            
         else:
             max_value = np.max(action_values)
+           
             max_actions = np.where(action_values == max_value)[0]
             
             
             action = np.random.choice(max_actions)
+        
 
         E = abs(action_values[action])
+        
         current_E_bin = round((E - 0) // self.binsize)
         self.H[current_E_bin] += 1
         return action
+    
+    def select_behaviour_action(self, state):
+        return self.select_action(state)
+
 
 import matplotlib.pyplot as plt
 
@@ -98,6 +186,9 @@ class MCAgent(SarsaAgent):
         self.epsilon = epsilon
 
 
+    def reset(self):
+        nrows,ncols,action_space = self.Q.shape
+        self.Q = np.zeros((nrows,ncols,action_space))
 
     def learn(self, tau: np.ndarray):
         """
@@ -131,6 +222,8 @@ class PolicySamplerAgent(SarsaAgent):
         self.gamma = gamma
         self.env = env
         self.epsilon = epsilon
+    
+    
 
 
     def sampler(self,E_min,E_max, flatness_criteria=0.8, max_iter=10000, binsize= 10):
